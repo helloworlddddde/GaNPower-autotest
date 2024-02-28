@@ -24,6 +24,7 @@ public:
     TestButton::Test getLabel(void);
     std::vector<SerialButton * *> required;
     void setupToolTip(void);
+    SerialButton * * findSerial(SerialButton::Equipment);
 
 private:
     Test label;

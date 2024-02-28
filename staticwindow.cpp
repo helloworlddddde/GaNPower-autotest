@@ -4,6 +4,7 @@ QList<QSerialPortInfo> dialog_infos;
 SerialButton * dialog_button = nullptr;
 QProgressDialog * progress_dialog;
 QQueue<QString> str_queue;
+
 void StaticWindow::onCompute(QString choice) {
     int idx = choice.split(":").at(0).toInt();
     serial_thread->setManualPort(dialog_button, dialog_infos[idx]);
@@ -21,6 +22,7 @@ void StaticWindow::debug_slot(QString str) {
         debug_output += str_queue.at(i) + "\n";
     }
     debug_text->setText(debug_output);
+    debug_text->verticalScrollBar()->setValue(debug_text->verticalScrollBar()->maximum());
 }
 
 void StaticWindow::updateProgress(int value) {
@@ -36,7 +38,7 @@ void StaticWindow::reset_table(void) {
 }
 
 void StaticWindow::save_table(void) {
-    QString filename = QFileDialog::getSaveFileName(NULL, tr("Save data"), "", tr("CSV file (*.csv)"));
+    QString filename = QFileDialog::getSaveFileName(NULL, tr("Save Test Data"), "", tr("CSV file (*.csv)"));
     QString csv_data = "";
     QFile csv_file(filename);
     for (int i = 0; i < result_table->rowCount(); i++) {
@@ -66,7 +68,7 @@ QString StaticWindow::vectorToString(std::vector<QString> vector) {
 }
 
 void StaticWindow::update_buttons(void) {
-    for(int i = 0; i < button_max; i++) {
+    for(int i = 0; i < serial_buttons.size(); i++) {
         SerialButton * temp_button = serial_buttons[i];
         if (temp_button->connected && temp_button->configured) {
             temp_button->setStyleSheet("background-color: rgba(0, 0, 255, 0.4);");
@@ -96,14 +98,21 @@ void StaticWindow::serialHandle(SerialThread::Mode mode) {
             update_buttons();
             break;
         case SerialThread::Mode::AUTOCONNECT:
+            for(size_t i = 0; i < serial_buttons.size(); i++) {
+                serial_buttons[i]->configured = 0;
+            }
             update_buttons();
             break;
         case SerialThread::Mode::CONFIGURE:
             update_buttons();
             break;
         case SerialThread::Mode::TEST:
+            for(size_t i = 0; i < serial_buttons.size(); i++) {
+                serial_buttons[i]->configured = 0;
+            }
             progress_dialog->hide();
             delete(progress_dialog);
+            update_buttons();
             break;
     }
 }
@@ -132,7 +141,6 @@ void StaticWindow::test(void) {
         return;
     }
     progress_dialog = new QProgressDialog(this);
-    progress_dialog->setCancelButton(nullptr);
     progress_dialog->show();
     serial_thread->test_set(test_buttons);
     serial_thread->configuration_set(configuration_data);
@@ -145,6 +153,7 @@ void StaticWindow::test(void) {
 StaticWindow::StaticWindow(QWidget *parent)
     : QMainWindow{parent}
 {
+    this->setAttribute(Qt::WA_DeleteOnClose);
     this->setFixedSize(QSize(1000, 350));
     this->setWindowIcon(QIcon(QCoreApplication::applicationDirPath() + "/Logo.ico"));
     this->setWindowTitle("Static Testing");
@@ -182,7 +191,7 @@ StaticWindow::StaticWindow(QWidget *parent)
         }
         step_data.clear();
         step_label = "";
-        QString filename = QFileDialog::getOpenFileName(NULL, "", "", tr("CSV file (*.csv)"));
+        QString filename = QFileDialog::getOpenFileName(NULL, tr("Get Step Data"), "", tr("CSV file (*.csv)"));
         QFile file(filename);
         file.open(QIODevice::ReadOnly);
         int toggle = 0;
@@ -249,20 +258,20 @@ StaticWindow::StaticWindow(QWidget *parent)
     configuration_data = gan_data[0];
     configuration_text->setText(configuration_label + "\n" + vectorToString(configuration_data));
 
-    serial_buttons = std::vector<SerialButton *>(button_max);
-    serial_buttons[0] = new SerialButton("MCU");
+    serial_buttons = std::vector<SerialButton *>();
+    serial_buttons.push_back(new SerialButton("MCU"));
     serial_buttons[0]->setLabel(SerialButton::Equipment::MCU);
     serial_buttons[0]->setTarget("MCU\n");
-    serial_buttons[1] = new SerialButton("PSU");
+    serial_buttons.push_back(new SerialButton("PSU"));
     serial_buttons[1]->setLabel(SerialButton::Equipment::PSU);
     serial_buttons[1]->setTarget("ITECH Ltd., IT6302, 800071020777520196, 1.05-1.04\n");
-    serial_buttons[2] = new SerialButton("HIPOT");
+    serial_buttons.push_back(new SerialButton("HIPOT"));
     serial_buttons[2]->setLabel(SerialButton::Equipment::HIPOT);
     serial_buttons[2]->setTarget("Tonghui,TH9320,Version:N1.4.7\n");
-    serial_buttons[3] = new SerialButton("LCR");
+    serial_buttons.push_back(new SerialButton("LCR"));
     serial_buttons[3]->setLabel(SerialButton::Equipment::LCR);
     serial_buttons[3]->setTarget("Tonghui, TH2827C,Ver 1.0.1  , Hardware Ver C6.0\n");
-    for(int i = 0; i < button_max; i++) {
+    for(size_t i = 0; i < serial_buttons.size(); i++) {
         hbox_1->addWidget(serial_buttons[i]);
         serial_buttons[i]->setPort(nullptr);
         connect(serial_buttons[i], &QPushButton::released, this, [this, i](void) {
@@ -271,11 +280,14 @@ StaticWindow::StaticWindow(QWidget *parent)
             }
             QList<QSerialPortInfo> serial_infos = QSerialPortInfo::availablePorts();
             QInputDialog serial_dialog;
+            serial_dialog.setLabelText("select port");
+            serial_dialog.setWindowTitle("Manual Connect");
             QStringList connections;
             for(int i = 0; i < serial_infos.size(); i++) {
                 connections << QString::number(i) + ":" + QString(serial_infos[i].portName() + " " + serial_infos[i].description());
             }
             if (connections.size() == 0) {
+                debug_slot("No port found");
                 return;
             }
             serial_dialog.setComboBoxItems(connections);
@@ -305,7 +317,7 @@ StaticWindow::StaticWindow(QWidget *parent)
     test_buttons[2]->setupToolTip();
     test_buttons[3] = new TestButton("BVSTEP");
     test_buttons[3]->setLabel(TestButton::Test::BVSTEP);
-    test_buttons[3]->required.insert(test_buttons[3]->required.end(), {&serial_buttons[2]});
+    test_buttons[3]->required.insert(test_buttons[3]->required.end(), {&serial_buttons[0], &serial_buttons[1], &serial_buttons[2]});
     test_buttons[3]->setupToolTip();
     for(int i = 0; i < test_max; i++) {
         hbox_2->addWidget(test_buttons[i]);
@@ -316,7 +328,7 @@ StaticWindow::StaticWindow(QWidget *parent)
             for (int j = 0; j < test_max; j++) {
                 test_buttons[j]->selected = 0;
             }
-            for (int k = 0; k < button_max; k++) {
+            for (int k = 0; k < serial_buttons.size(); k++) {
                 serial_buttons[k]->configured = 0;
             }
             test_buttons[i]->selected = 1;
@@ -364,6 +376,7 @@ StaticWindow::StaticWindow(QWidget *parent)
     result_table->setItem(0, 0, new QTableWidgetItem("Date"));
     result_table->setItem(0, 1, new QTableWidgetItem("Row"));
     result_table->setItem(0, 2, new QTableWidgetItem("Column"));
+    result_table->setItem(0, 3, new QTableWidgetItem("Device"));
     connect(serial_thread, &SerialThread::progressUpdate, this, &StaticWindow::updateProgress);
     debug_text = new QTextEdit("");
     step_vbox->addWidget(debug_text);
@@ -372,5 +385,18 @@ StaticWindow::StaticWindow(QWidget *parent)
 }
 
 void StaticWindow::closeEvent(QCloseEvent * event) {
+    serial_thread->wait();
+    delete(serial_thread);
+    for(size_t i = 0; i < serial_buttons.size(); i++) {
+        if (serial_buttons[i]->getPort() != nullptr) {
+            serial_buttons[i]->getPort()->moveToThread(this->thread());
+            serial_buttons[i]->getPort()->close();
+            delete(serial_buttons[i]->getPort());
+            serial_buttons[i]->setPort(nullptr);
+        }
+    }
+    delete(central_widget);
+    str_queue.clear();
     emit signal_1();
 }
+

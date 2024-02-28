@@ -29,6 +29,9 @@ public:
     int configured = 0;
     int connected = 0;
 
+    void write(QByteArray, int);
+    QByteArray read(int, int);
+
 private:
     Equipment label;
     QSerialPort * port;

@@ -15,6 +15,7 @@ StartWindow::StartWindow(QWidget *parent)
 {
     static_on = 0;
 
+    this->setAttribute(Qt::WA_DeleteOnClose);
     this->setFixedSize(200, 100);
     this->setWindowIcon(QIcon(QCoreApplication::applicationDirPath() + "/Logo.ico"));
     this->setWindowTitle("Start Menu");

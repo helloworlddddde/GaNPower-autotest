@@ -25,6 +25,14 @@ void TestButton::setupToolTip(void) {
     this->setToolTip(str);
 }
 
+SerialButton * * TestButton::findSerial(SerialButton::Equipment label) {
+    for(size_t i = 0; i < required.size(); i++) {
+        if ((*required[i])->getLabel() == label) {
+            return required[i];
+        }
+    }
+    return nullptr;
+}
 TestButton::~TestButton() {
 
 }

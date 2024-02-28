@@ -35,6 +35,7 @@ class SerialThread : public QThread
 
 public:
     explicit SerialThread(QObject *parent = nullptr);
+    virtual ~SerialThread();
     enum Mode {
         NONE,
         MANUALCONNECT,
@@ -79,10 +80,10 @@ private:
     void psu_configure(SerialButton * button, TestButton::Test test_choice);
     void hipot_configure(SerialButton * button, TestButton::Test test_choice);
     void lcr_configure(SerialButton * button, TestButton::Test test_choice);
-    void bv_test(void);
-    void vth_test(void);
-    void rdson_test(void);
-    void bvstep_test(void);
+    void bv_test(TestButton *);
+    void vth_test(TestButton *);
+    void rdson_test(TestButton *);
+    void bvstep_test(TestButton *);
     int max_row = 1;
     int max_col = 1;
 };
