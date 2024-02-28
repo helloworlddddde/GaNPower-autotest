@@ -60,6 +60,7 @@ public:
 signals:
     void serialComplete(Mode mode);
     void progressUpdate(int value);
+    void tableUpdate(int row, int col, QString val);
     void debug(QString str);
 
 private:

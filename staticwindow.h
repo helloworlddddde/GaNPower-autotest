@@ -25,6 +25,7 @@ public slots:
     void save_table(void);
     void onCompute(QString);
     void updateProgress(int);
+    void updateTable(int, int, QString);
     void debug_slot(QString);
 protected:
     void closeEvent(QCloseEvent *event);

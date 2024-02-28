@@ -25,7 +25,7 @@ public:
     std::vector<SerialButton * *> required;
     void setupToolTip(void);
     SerialButton * * findSerial(SerialButton::Equipment);
-
+    int handshake(int, int);
 private:
     Test label;
 

@@ -1,4 +1,5 @@
 #include "serialthread.h"
+#include "qdatetime.h"
 
 SerialThread::SerialThread(QObject *parent)
     : QThread{parent} {
@@ -11,19 +12,31 @@ void SerialThread::bv_test(TestButton * selected) {
 void SerialThread::vth_test(TestButton * selected) {
     SerialButton * mcu = *selected->findSerial(SerialButton::MCU);
     SerialButton * psu = *selected->findSerial(SerialButton::PSU);
-    psu->write("INST CH1\n", 300);
-    psu->write("CHAN:OUTP ON\n", 300);
-    psu->write("INST CH3\n", 300);
-    psu->write("VOLT 1V\n", 300);
-    psu->write("CHAN:OUTP ON\n", 300);
-    psu->write("MEAS:CURR?\n", 300);
-    QByteArray i_low = psu->read(200, 300);
-    psu->write("VOLT 2V\n", 500);
-    psu->write("MEAS:CURR?\n", 300);
-    QByteArray i_high = psu->read(200, 300);
-    psu->write("CHAN:OUTP OFF\n", 300);
-    psu->write("INST CH1\n", 300);
-    psu->write("CHAN:OUTP OFF\n", 300);
+    psu->write("SYST:REM\n", 300);
+    psu->write("APPL CH1,5V,1A\n", 300);
+    psu->write("APPL CH3,0.9V,0.1A\n", 300);
+    int p = 0;
+    float progress_scale = 100/(max_col * max_row);
+    for(int c = 0; c < max_col; c++) {
+        for(int r = 0; r < max_row; r++) {
+            psu->write("INST CH1\n", 300);
+            psu->write("CHAN:OUTP ON\n", 300);
+            psu->write("INST CH3\n", 300);
+            psu->write("VOLT 1V\n", 300);
+            psu->write("CHAN:OUTP ON\n", 300);
+            psu->write("MEAS:CURR?\n", 300);
+            QByteArray i_low = psu->read(200, 300);
+            psu->write("VOLT 2V\n", 500);
+            psu->write("MEAS:CURR?\n", 300);
+            QByteArray i_high = psu->read(200, 300);
+            psu->write("CHAN:OUTP OFF\n", 300);
+            psu->write("INST CH1\n", 300);
+            psu->write("CHAN:OUTP OFF\n", 300);
+            p++;
+            emit tableUpdate(p, 0, QDateTime::currentDateTime().toString());
+            emit progressUpdate(p * progress_scale);
+        }
+    }
     psu->write("SYST:LOC\n", 300);
 }
 
@@ -60,15 +73,12 @@ void SerialThread::manual_connect(void) {
         emit serialComplete(mode);
         return;
     }
-    const char * ID_comm = "*IDN?\n";
-    while(temp_port->waitForReadyRead(timeout_msec));
+    QByteArray ID_comm = "*IDN?\n";
     temp_port->write(ID_comm);
     while(temp_port->waitForBytesWritten(timeout_msec));
     while(temp_port->waitForReadyRead(timeout_msec));
-    char ID_bytes[buffer_max];
-    temp_port->readLine(ID_bytes, buffer_max);
-    QString ID_str = QString(ID_bytes);
-    if (ID_str == manual_port->getTarget()) {
+    QString ID_str = QString(temp_port->readLine(buffer_max));
+    if (ID_str.contains(manual_port->getTarget())) {
         manual_port->setPort(temp_port);
         manual_port->connected = 1;
     } else {
@@ -117,18 +127,15 @@ void SerialThread::autoconnect(void) {
         if (!temp_port->open(QIODevice::ReadWrite)) {
             continue;
         }
-        const char * ID_comm = "*IDN?\n";
+        QByteArray ID_comm = "*IDN?\n";
         temp_port->write(ID_comm);
         while(temp_port->waitForBytesWritten(timeout_msec));
         while(temp_port->waitForReadyRead(timeout_msec));
-        char ID_bytes[buffer_max];
-        temp_port->readLine(ID_bytes, buffer_max);
-        QString ID_str = QString(ID_bytes);
-
+        QString ID_str = QString(temp_port->readLine(buffer_max));
         int found = 0;
         for(size_t i = 0; i < selected->required.size(); i++) {
             SerialButton * temp_button = *(selected->required[i]);
-            if (temp_button->getTarget() == ID_str) {
+            if (ID_str.contains(temp_button->getTarget())) {
                 temp_button->setPort(temp_port);
                 emit debug("connected: " + temp_button->getTarget());
                 found = 1;
@@ -219,6 +226,15 @@ void SerialThread::test(void) {
             emit serialComplete(mode);
             return;
         }
+    }
+
+    if (!(selected->handshake(buffer_max, timeout_msec))) {
+        for(size_t i = 0; i < selected->required.size(); i++) {
+            (*selected->required[i])->connected = 0;
+        }
+        emit debug("faulty serial connnections");
+        emit serialComplete(mode);
+        return;
     }
 
     switch(selected->getLabel()) {

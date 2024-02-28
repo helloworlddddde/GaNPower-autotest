@@ -12,6 +12,9 @@ void StaticWindow::onCompute(QString choice) {
     serial_thread->start();
 }
 
+void StaticWindow::updateTable(int row, int col, QString val) {
+    result_table->setItem(row, col, new QTableWidgetItem(val));
+}
 void StaticWindow::debug_slot(QString str) {
     str_queue.enqueue(str);
     if (str_queue.size() > 10) {
@@ -141,6 +144,8 @@ void StaticWindow::test(void) {
         return;
     }
     progress_dialog = new QProgressDialog(this);
+    progress_dialog->setAutoClose(0);
+    progress_dialog->setWindowTitle("Test Progress");
     progress_dialog->show();
     serial_thread->test_set(test_buttons);
     serial_thread->configuration_set(configuration_data);
@@ -264,13 +269,13 @@ StaticWindow::StaticWindow(QWidget *parent)
     serial_buttons[0]->setTarget("MCU\n");
     serial_buttons.push_back(new SerialButton("PSU"));
     serial_buttons[1]->setLabel(SerialButton::Equipment::PSU);
-    serial_buttons[1]->setTarget("ITECH Ltd., IT6302, 800071020777520196, 1.05-1.04\n");
+    serial_buttons[1]->setTarget("IT6302");
     serial_buttons.push_back(new SerialButton("HIPOT"));
     serial_buttons[2]->setLabel(SerialButton::Equipment::HIPOT);
-    serial_buttons[2]->setTarget("Tonghui,TH9320,Version:N1.4.7\n");
+    serial_buttons[2]->setTarget("TH9320");
     serial_buttons.push_back(new SerialButton("LCR"));
     serial_buttons[3]->setLabel(SerialButton::Equipment::LCR);
-    serial_buttons[3]->setTarget("Tonghui, TH2827C,Ver 1.0.1  , Hardware Ver C6.0\n");
+    serial_buttons[3]->setTarget("TH2827C");
     for(size_t i = 0; i < serial_buttons.size(); i++) {
         hbox_1->addWidget(serial_buttons[i]);
         serial_buttons[i]->setPort(nullptr);
@@ -382,6 +387,7 @@ StaticWindow::StaticWindow(QWidget *parent)
     step_vbox->addWidget(debug_text);
     debug_text->setReadOnly(1);
     connect(serial_thread, &SerialThread::debug, this, &StaticWindow::debug_slot);
+    connect(serial_thread, &SerialThread::tableUpdate, this, &StaticWindow::updateTable);
 }
 
 void StaticWindow::closeEvent(QCloseEvent * event) {
