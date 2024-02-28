@@ -10,16 +10,14 @@ void StaticWindow::reset_table(void) {
 
 void StaticWindow::save_table(void) {
     QString filename = QFileDialog::getSaveFileName(NULL, tr("Save data"), "", tr("CSV file (*.csv)"));
+    QString csv_data = "";
     QFile csv_file(filename);
-    int rows = table->rowCount();
-    int columns = table->columnCount();
-
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < columns; j++) {
-            textData += table->item(i, j)->data(0).toString();
-            textData += ", ";   // for .csv file format
+    for (int i = 0; i < result_table->rowCount(); i++) {
+        for (int j = 0; j < result_table->columnCount(); j++) {
+            csv_data += result_table->item(i, j)->data(0).toString();
+            csv_data += ", ";
         }
-        textData += "\n";             // (optional: for new line segmentation)
+        csv_data += "\n";
     }
     if(csv_file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         QTextStream out(&csv_file);
@@ -222,7 +220,7 @@ StaticWindow::StaticWindow(QWidget *parent)
     hbox_3->addWidget(test_button);
     save_button = new QPushButton("save");
     hbox_3->addWidget(save_button);
-    connect(save_Button, &QPushButton::released, this, &StaticWindow::save_table);
+    connect(save_button, &QPushButton::released, this, &StaticWindow::save_table);
 
     serial_thread = new SerialThread(this);
     connect(serial_thread, &SerialThread::serialComplete, this, &StaticWindow::serialHandle);
