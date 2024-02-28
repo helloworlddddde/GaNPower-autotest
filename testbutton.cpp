@@ -12,6 +12,19 @@ void TestButton::setLabel(Test label) {
 TestButton::Test TestButton::getLabel(void) {
     return label;
 }
+
+void TestButton::setupToolTip(void) {
+    QString str = "";
+    for(size_t i = 0; i < required.size(); i++) {
+        if (i == 0) {
+            str += (*(required[i]))->text();
+        } else {
+            str += ", " + (*(required[i]))->text();
+        }
+    }
+    this->setToolTip(str);
+}
+
 TestButton::~TestButton() {
 
 }

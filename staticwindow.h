@@ -21,9 +21,11 @@ signals:
     void signal_1(void);
 public slots:
     void serialHandle(SerialThread::Mode mode);
-    void indexChanged(int);
     void reset_table(void);
     void save_table(void);
+    void onCompute(QString);
+    void updateProgress(int);
+    void debug_slot(QString);
 protected:
     void closeEvent(QCloseEvent *event);
 
@@ -34,11 +36,17 @@ private:
 
     void configure(void);
 
+    void test(void);
+
     void update_buttons(void);
 
+    QTextEdit * step_text;
+    QVBoxLayout * step_vbox;
 
+    QPushButton * select_button;
+    QVBoxLayout * select_vbox;
 
-
+    QPushButton * step_button;
     QWidget * central_widget;
     QVBoxLayout * central_vbox;
 
@@ -47,9 +55,14 @@ private:
     QHBoxLayout * hbox_2;
     QHBoxLayout * hbox_3;
 
+    QString step_label;
+    std::vector<QString> step_data;
+
     QPushButton * new_button;
     QPushButton * test_button;
     QPushButton * save_button;
+
+    QTextEdit * debug_text;
 
     const int button_max = 4;
     std::vector<SerialButton *> serial_buttons;
@@ -72,7 +85,6 @@ private:
 
     QComboBox * row_combox;
     QComboBox * col_combox;
-
     const int max_row = 5;
     const int max_col = 5;
     QComboBox * gan_combox;

@@ -17,7 +17,6 @@ void SerialButton::setTarget(const QString & target) {
     this->target = target;
 }
 
-
 QSerialPort * SerialButton::getPort(void) {
     return port;
 }
