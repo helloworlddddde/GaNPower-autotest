@@ -35,7 +35,7 @@ QString SerialButton::getTarget(void) {
 
 QByteArray SerialButton::read(int max_size, int msec) {
     while(this->getPort()->waitForReadyRead(msec));
-    return this->getPort()->readLine(max_size);
+    return this->getPort()->read(max_size);
 }
 
 SerialButton::~SerialButton() {

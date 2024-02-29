@@ -56,6 +56,7 @@ public:
 
     void setManualPort(SerialButton *, QSerialPortInfo);
     void configuration_set(std::vector<QString> config_data);
+    void step_set(std::vector<QString> step_data);
 
 signals:
     void serialComplete(Mode mode);
@@ -75,7 +76,7 @@ private:
     QSerialPortInfo manual_info;
 
     std::vector<QString> config_data;
-
+    std::vector<QString> step_data;
 
     void mcu_configure(SerialButton * button, TestButton::Test test_choice);
     void psu_configure(SerialButton * button, TestButton::Test test_choice);

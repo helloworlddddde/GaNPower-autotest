@@ -135,6 +135,7 @@ void StaticWindow::configure(void) {
     }
     serial_thread->test_set(test_buttons);
     serial_thread->configuration_set(configuration_data);
+    serial_thread->step_set(step_data);
     serial_thread->mode = SerialThread::Mode::CONFIGURE;
     serial_thread->start();
 }
@@ -149,6 +150,7 @@ void StaticWindow::test(void) {
     progress_dialog->show();
     serial_thread->test_set(test_buttons);
     serial_thread->configuration_set(configuration_data);
+    serial_thread->step_set(step_data);
     serial_thread->setMaxRow(row_combox->currentIndex() + 1);
     serial_thread->setMaxCol(col_combox->currentIndex() + 1);
     serial_thread->mode = SerialThread::Mode::TEST;
@@ -159,7 +161,7 @@ StaticWindow::StaticWindow(QWidget *parent)
     : QMainWindow{parent}
 {
     this->setAttribute(Qt::WA_DeleteOnClose);
-    this->setFixedSize(QSize(1000, 350));
+    this->setFixedSize(QSize(1250, 350));
     this->setWindowIcon(QIcon(QCoreApplication::applicationDirPath() + "/Logo.ico"));
     this->setWindowTitle("Static Testing");
     central_widget = new QWidget(this);
@@ -322,7 +324,7 @@ StaticWindow::StaticWindow(QWidget *parent)
     test_buttons[2]->setupToolTip();
     test_buttons[3] = new TestButton("BVSTEP");
     test_buttons[3]->setLabel(TestButton::Test::BVSTEP);
-    test_buttons[3]->required.insert(test_buttons[3]->required.end(), {&serial_buttons[0], &serial_buttons[1], &serial_buttons[2]});
+    test_buttons[3]->required.insert(test_buttons[3]->required.end(), {&serial_buttons[2]});
     test_buttons[3]->setupToolTip();
     for(int i = 0; i < test_max; i++) {
         hbox_2->addWidget(test_buttons[i]);
@@ -379,8 +381,8 @@ StaticWindow::StaticWindow(QWidget *parent)
         }
     }
     result_table->setItem(0, 0, new QTableWidgetItem("Date"));
-    result_table->setItem(0, 1, new QTableWidgetItem("Row"));
-    result_table->setItem(0, 2, new QTableWidgetItem("Column"));
+    result_table->setItem(0, 1, new QTableWidgetItem("Column"));
+    result_table->setItem(0, 2, new QTableWidgetItem("Row"));
     result_table->setItem(0, 3, new QTableWidgetItem("Device"));
     connect(serial_thread, &SerialThread::progressUpdate, this, &StaticWindow::updateProgress);
     debug_text = new QTextEdit("");

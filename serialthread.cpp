@@ -5,8 +5,142 @@ SerialThread::SerialThread(QObject *parent)
     : QThread{parent} {
 }
 
-void SerialThread::bv_test(TestButton * selected) {
+void SerialThread::mcu_configure(SerialButton * mcu_button, TestButton::Test test_choice) {
+    switch(test_choice) {
+    case TestButton::Test::NOTEST:
+        break;
+    case TestButton::Test::BV:
+        break;
+    case TestButton::Test::VTH:
+        break;
+    case TestButton::Test::RDSON:
+        break;
+    case TestButton::Test::BVSTEP:
+        break;
+    }
+    mcu_button->configured = 1;
+    emit debug("MCU configured");
+    return;
+}
 
+void SerialThread::psu_configure(SerialButton * psu_button, TestButton::Test test_choice) {
+    switch(test_choice) {
+    case TestButton::Test::NOTEST:
+        break;
+    case TestButton::Test::BV:
+        psu_button->write("SYST:REM\n", timeout_msec);
+        psu_button->write("APPL CH1,5V,1A\n", timeout_msec);
+        break;
+    case TestButton::Test::VTH:
+        psu_button->write("SYST:REM\n", timeout_msec);
+        psu_button->write("APPL CH1,5V,1A\n", timeout_msec);
+        psu_button->write("APPL CH3,0.9V,0.1A\n", timeout_msec);
+        break;
+    case TestButton::Test::RDSON:
+        psu_button->write("SYST:REM\n", timeout_msec);
+        psu_button->write("APPL CH1,5V,1A\n", timeout_msec);
+        psu_button->write("APPL CH3,6V,0.5A\n", timeout_msec);
+        break;
+    case TestButton::Test::BVSTEP:
+        psu_button->write("SYST:REM\n", timeout_msec);
+        psu_button->write("APPL CH1,5V,1A\n", timeout_msec);
+        break;
+    }
+    psu_button->configured = 1;
+    emit debug("PSU configured");
+    return;
+}
+
+void SerialThread::hipot_configure(SerialButton * hipot_button, TestButton::Test test_choice) {
+    QString BV_VDATA;
+    QString BV_UPCDATA;
+    QString data_str;
+    QByteArray data;
+    switch(test_choice) {
+    case TestButton::Test::NOTEST:
+        break;
+    case TestButton::Test::BV:
+        BV_VDATA = config_data[1];
+        BV_UPCDATA = config_data[2];
+        data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC BV_UPCDATA;LOWC 0;TTIM 0.1;RTIM 0.1;FTIM 0.1;ARC 0;WTIM 0;RAMP ON\n";
+        data_str.replace("BV_VDATA", BV_VDATA);
+        data_str.replace("BV_UPCDATA", BV_UPCDATA);
+        data = QByteArray(data_str.toUtf8());
+        hipot_button->write(data, timeout_msec);
+        break;
+    case TestButton::Test::VTH:
+        break;
+    case TestButton::Test::RDSON:
+        break;
+    case TestButton::Test::BVSTEP:
+        if (step_data.empty()) {
+            qDebug() << "empty step data";
+            return;
+        }
+        BV_VDATA = step_data[0];
+        data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC 0.02;LOWC 0;TTIM 0.1;RTIM 0.1;FTIM 0.1;ARC 0;WTIM 0;RAMP ON\n";
+        data_str.replace("BV_VDATA", BV_VDATA);
+        data = QByteArray(data_str.toUtf8());
+        hipot_button->write(data, timeout_msec);
+        break;
+    }
+    hipot_button->configured = 1;
+    emit debug("HIPOT configured");
+    return;
+}
+
+void SerialThread::lcr_configure(SerialButton * lcr_button, TestButton::Test test_choice) {
+    switch(test_choice) {
+    case TestButton::Test::NOTEST:
+        break;
+    case TestButton::Test::BV:
+        break;
+    case TestButton::Test::VTH:
+        break;
+    case TestButton::Test::RDSON:
+        lcr_button->write("FUNC:IMP DCR\n", timeout_msec);
+        break;
+    case TestButton::Test::BVSTEP:
+        break;
+    }
+    lcr_button->configured = 1;
+    emit debug("LCR configured");
+    return;
+}
+
+void SerialThread::bv_test(TestButton * selected) {
+    SerialButton * mcu = *selected->findSerial(SerialButton::MCU);
+    SerialButton * psu = *selected->findSerial(SerialButton::PSU);
+    SerialButton * hipot = *selected->findSerial(SerialButton::HIPOT);
+    psu->write("SYST:REM\n", 300);
+    psu->write("APPL CH1,5V,1A\n", 300);
+    psu->write("INST CH1\n", 300);
+    psu->write("CHAN:OUTP ON\n", 300);
+    int p = 0;
+    float progress_scale = 100/(max_col * max_row);
+    for(int c = 0; c < max_col; c++) {
+        for(int r = 0; r < max_row; r++) {
+            QByteArray mcu_data = QString::number(c).append(QString::number(r)).append("000\n").toUtf8();
+            mcu->write(mcu_data, 300);
+            hipot->write("FUNC:STAR\n", 300);
+            msleep(500);
+            QByteArray H = hipot->read(200, 300);
+            msleep(300);
+            hipot->write("FUNC:STOP\n", 300);
+            msleep(300);
+            p++;
+            emit tableUpdate(p, 0, QDateTime::currentDateTime().toString().trimmed());
+            emit tableUpdate(p, 1, QString::number(c).trimmed());
+            emit tableUpdate(p, 2, QString::number(r).trimmed());
+            emit tableUpdate(p, 3, config_data[0].trimmed());
+            emit tableUpdate(p, 7, H.trimmed());
+            emit progressUpdate(p * progress_scale);
+        }
+    }
+    psu->write("INST CH1\n", 300);
+    psu->write("CHAN:OUTP OFF\n", 300);
+    psu->write("SYST:LOC\n", 300);
+    mcu->write("000000", 300);
 }
 
 void SerialThread::vth_test(TestButton * selected) {
@@ -14,39 +148,151 @@ void SerialThread::vth_test(TestButton * selected) {
     SerialButton * psu = *selected->findSerial(SerialButton::PSU);
     psu->write("SYST:REM\n", 300);
     psu->write("APPL CH1,5V,1A\n", 300);
-    psu->write("APPL CH3,0.9V,0.1A\n", 300);
+    psu->write("APPL CH3,6V,0.5A\n", 300);
+    psu->write("INST CH1\n", 300);
+    psu->write("CHAN:OUTP ON\n", 300);
     int p = 0;
     float progress_scale = 100/(max_col * max_row);
     for(int c = 0; c < max_col; c++) {
         for(int r = 0; r < max_row; r++) {
-            psu->write("INST CH1\n", 300);
-            psu->write("CHAN:OUTP ON\n", 300);
+            QByteArray mcu_data = QString::number(c).append(QString::number(r)).append("000\n").toUtf8();
+            mcu->write(mcu_data, 300);
             psu->write("INST CH3\n", 300);
-            psu->write("VOLT 1V\n", 300);
+            psu->write("VOLT 0.9V\n", 300);
+            msleep(500);
             psu->write("CHAN:OUTP ON\n", 300);
+            msleep(500);
             psu->write("MEAS:CURR?\n", 300);
+            msleep(800);
             QByteArray i_low = psu->read(200, 300);
             psu->write("VOLT 2V\n", 500);
+            msleep(500);
             psu->write("MEAS:CURR?\n", 300);
+            msleep(500);
             QByteArray i_high = psu->read(200, 300);
             psu->write("CHAN:OUTP OFF\n", 300);
-            psu->write("INST CH1\n", 300);
-            psu->write("CHAN:OUTP OFF\n", 300);
+            // qDebug() << i_low << i_high;
             p++;
-            emit tableUpdate(p, 0, QDateTime::currentDateTime().toString());
+            emit tableUpdate(p, 0, QDateTime::currentDateTime().toString().trimmed().remove(","));
+            emit tableUpdate(p, 1, QString::number(c).trimmed());
+            emit tableUpdate(p, 2, QString::number(r).trimmed());
+            emit tableUpdate(p, 3, config_data[0].trimmed());
+            emit tableUpdate(p, 4, i_low.trimmed());
+            emit tableUpdate(p, 5, i_high.trimmed());
             emit progressUpdate(p * progress_scale);
         }
     }
+    psu->write("INST CH1\n", 300);
+    psu->write("CHAN:OUTP OFF\n", 300);
     psu->write("SYST:LOC\n", 300);
+    mcu->write("000000", 300);
 }
 
 void SerialThread::rdson_test(TestButton * selected) {
-
+    SerialButton * mcu = *selected->findSerial(SerialButton::MCU);
+    SerialButton * psu = *selected->findSerial(SerialButton::PSU);
+    SerialButton * lcr = *selected->findSerial(SerialButton::LCR);
+    psu->write("SYST:REM\n", 300);
+    psu->write("APPL CH1,5V,1A\n", 300);
+    psu->write("APPL CH3,6V,0.5A\n", 300);
+    psu->write("INST CH1\n", 300);
+    psu->write("CHAN:OUTP ON\n", 300);
+    int p = 0;
+    float progress_scale = 100/(max_col * max_row);
+    for(int c = 0; c < max_col; c++) {
+        for(int r = 0; r < max_row; r++) {
+            QByteArray mcu_data = QString::number(c).append(QString::number(r)).append("000\n").toUtf8();
+            mcu->write(mcu_data, 300);
+            psu->write("INST CH3\n", 300);
+            msleep(500);
+            psu->write("CHAN:OUTP ON\n", 300);
+            msleep(500);
+            lcr->write("FETC?\n", 300);
+            msleep(800);
+            QByteArray R = lcr->read(200, 300);
+            psu->write("CHAN:OUTP OFF\n", 300);
+            // qDebug() << i_low << i_high;
+            p++;
+            emit tableUpdate(p, 0, QDateTime::currentDateTime().toString().trimmed());
+            emit tableUpdate(p, 1, QString::number(c).trimmed());
+            emit tableUpdate(p, 2, QString::number(r).trimmed());
+            emit tableUpdate(p, 3, config_data[0].trimmed());
+            emit tableUpdate(p, 6, R.trimmed());
+            emit progressUpdate(p * progress_scale);
+        }
+    }
+    psu->write("INST CH1\n", 300);
+    psu->write("CHAN:OUTP OFF\n", 300);
+    psu->write("SYST:LOC\n", 300);
+    mcu->write("000000", 300);
 }
 
 void SerialThread::bvstep_test(TestButton * selected) {
-
+    SerialButton * hipot = *selected->findSerial(SerialButton::HIPOT);
+    for(size_t i = 0; i < step_data.size(); i++) {
+        QString BV_VDATA = step_data[i];
+        QString data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC 0.02;LOWC 0;TTIM 0.1;RTIM 0.1;FTIM 0.1;ARC 0;WTIM 0;RAMP ON\n";
+        data_str.replace("BV_VDATA", BV_VDATA);
+        QByteArray data = data_str.toUtf8();
+        msleep(300);
+        hipot->write(data, 300);
+        msleep(300);
+        hipot->write("FUNC:STAR\n", 300);
+        msleep(300);
+        hipot->write("FUNC:STOP\n", 300);
+        msleep(300);
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void SerialThread::setMaxRow(int max_row) {
     this->max_row = max_row;
@@ -77,7 +323,7 @@ void SerialThread::manual_connect(void) {
     temp_port->write(ID_comm);
     while(temp_port->waitForBytesWritten(timeout_msec));
     while(temp_port->waitForReadyRead(timeout_msec));
-    QString ID_str = QString(temp_port->readLine(buffer_max));
+    QString ID_str = QString(temp_port->read(buffer_max));
     if (ID_str.contains(manual_port->getTarget())) {
         manual_port->setPort(temp_port);
         manual_port->connected = 1;
@@ -131,7 +377,7 @@ void SerialThread::autoconnect(void) {
         temp_port->write(ID_comm);
         while(temp_port->waitForBytesWritten(timeout_msec));
         while(temp_port->waitForReadyRead(timeout_msec));
-        QString ID_str = QString(temp_port->readLine(buffer_max));
+        QString ID_str = QString(temp_port->read(buffer_max));
         int found = 0;
         for(size_t i = 0; i < selected->required.size(); i++) {
             SerialButton * temp_button = *(selected->required[i]);
@@ -160,6 +406,10 @@ void SerialThread::autoconnect(void) {
 
 void SerialThread::test_set(std::vector<TestButton *> test_buttons) {
     this->test_buttons = test_buttons;
+}
+
+void SerialThread::step_set(std::vector<QString> step_data) {
+    this->step_data = step_data;
 }
 
 void SerialThread::configure(void) {
@@ -228,6 +478,19 @@ void SerialThread::test(void) {
         }
     }
 
+    // for(size_t i = 0; i < selected->required.size(); i++) {
+    //     SerialButton * serial_button = *selected->required[i];
+    //     QByteArray ID_comm = "*IDN?\n";
+    //     serial_button->write(ID_comm, timeout_msec);
+    //     QString id_str = QString(serial_button->read(buffer_max, timeout_msec));
+    //     qDebug() << id_str;
+    //     if(!id_str.contains(serial_button->getTarget())) {
+    //         emit debug("faulty serial connnections");
+    //         emit serialComplete(mode);
+    //         return;
+    //     }
+    // }
+
     if (!(selected->handshake(buffer_max, timeout_msec))) {
         for(size_t i = 0; i < selected->required.size(); i++) {
             (*selected->required[i])->connected = 0;
@@ -273,100 +536,7 @@ void SerialThread::setManualPort(SerialButton * manual_port, QSerialPortInfo man
 
 
 
-void SerialThread::mcu_configure(SerialButton * mcu_button, TestButton::Test test_choice) {
-    switch(test_choice) {
-        case TestButton::Test::NOTEST:
-            break;
-        case TestButton::Test::BV:
-            break;
-        case TestButton::Test::VTH:
-            break;
-        case TestButton::Test::RDSON:
-            break;
-        case TestButton::Test::BVSTEP:
-            break;
-    }
-    mcu_button->configured = 1;
-    emit debug("MCU configured");
-    return;
-}
 
-void SerialThread::psu_configure(SerialButton * psu_button, TestButton::Test test_choice) {
-    switch(test_choice) {
-        case TestButton::Test::NOTEST:
-            break;
-        case TestButton::Test::BV:
-            psu_button->write("SYST:REM\n", timeout_msec);
-            psu_button->write("APPL CH1,5V,1A\n", timeout_msec);
-            break;
-        case TestButton::Test::VTH:
-            psu_button->write("SYST:REM\n", timeout_msec);
-            psu_button->write("APPL CH1,5V,1A\n", timeout_msec);
-            psu_button->write("APPL CH3,0.9V,0.1A\n", timeout_msec);
-            break;
-        case TestButton::Test::RDSON:
-            psu_button->write("SYST:REM\n", timeout_msec);
-            psu_button->write("APPL CH1,5V,1A\n", timeout_msec);
-            psu_button->write("APPL CH3,6V,0.5A\n", timeout_msec);
-            break;
-        case TestButton::Test::BVSTEP:
-            psu_button->write("SYST:REM\n", timeout_msec);
-            psu_button->write("APPL CH1,5V,1A\n", timeout_msec);
-            break;
-    }
-    psu_button->configured = 1;
-    emit debug("PSU configured");
-    return;
-}
-
-void SerialThread::hipot_configure(SerialButton * hipot_button, TestButton::Test test_choice) {
-    QString BV_VDATA;
-    QString BV_UPCDATA;
-    QString data_str;
-    QByteArray data;
-    switch(test_choice) {
-    case TestButton::Test::NOTEST:
-        break;
-    case TestButton::Test::BV:
-        qDebug() << config_data[1] << config_data[2];
-        BV_VDATA = config_data[1];
-        BV_UPCDATA = config_data[2];
-        data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC BV_UPCDATA;LOWC 0;TTIM 0.1;RTIM 0.1;FTIM 0.1;ARC 0;WTIM 0;RAMP ON\n";
-        data_str.replace("BV_VDATA", BV_VDATA);
-        data_str.replace("BV_UPCDATA", BV_UPCDATA);
-        data = QByteArray(data_str.toUtf8());
-        hipot_button->write(data, timeout_msec);
-        break;
-    case TestButton::Test::VTH:
-        break;
-    case TestButton::Test::RDSON:
-        break;
-    case TestButton::Test::BVSTEP:
-        break;
-    }
-    hipot_button->configured = 1;
-    emit debug("HIPOT configured");
-    return;
-}
-
-void SerialThread::lcr_configure(SerialButton * lcr_button, TestButton::Test test_choice) {
-    switch(test_choice) {
-    case TestButton::Test::NOTEST:
-        break;
-    case TestButton::Test::BV:
-        break;
-    case TestButton::Test::VTH:
-        break;
-    case TestButton::Test::RDSON:
-        lcr_button->write("FUNC:IMP DCR\n", timeout_msec);
-        break;
-    case TestButton::Test::BVSTEP:
-        break;
-    }
-    lcr_button->configured = 1;
-    emit debug("LCR configured");
-    return;
-}
 
 SerialThread::~SerialThread() {
 }
