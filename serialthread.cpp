@@ -23,6 +23,13 @@ void SerialThread::mcu_configure(SerialButton * mcu_button, TestButton::Test tes
     return;
 }
 
+void SerialThread::setAbort() {
+    this->abort = 1;
+}
+int SerialThread::checkAbort(void) {
+    return this->abort;
+}
+
 void SerialThread::psu_configure(SerialButton * psu_button, TestButton::Test test_choice) {
     switch(test_choice) {
     case TestButton::Test::NOTEST:
@@ -53,7 +60,10 @@ void SerialThread::psu_configure(SerialButton * psu_button, TestButton::Test tes
 
 void SerialThread::hipot_configure(SerialButton * hipot_button, TestButton::Test test_choice) {
     QString BV_VDATA;
-    QString BV_UPCDATA;
+    QString BV_UPPCDATA;
+    QString BV_TTIMDATA;
+    QString BV_RTIMDATA;
+    QString BV_FTIMDATA;
     QString data_str;
     QByteArray data;
     switch(test_choice) {
@@ -61,11 +71,11 @@ void SerialThread::hipot_configure(SerialButton * hipot_button, TestButton::Test
         break;
     case TestButton::Test::BV:
         BV_VDATA = config_data[1];
-        BV_UPCDATA = config_data[2];
-        data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC BV_UPCDATA;LOWC 0;TTIM 0.1;RTIM 0.1;FTIM 0.1;ARC 0;WTIM 0;RAMP ON\n";
+        BV_UPPCDATA = config_data[2];
+        data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC BV_UPPCDATA;LOWC 0;TTIM 0.1;RTIM 0.1;FTIM 0.1;ARC 0;WTIM 0;RAMP ON\n";
         data_str.replace("BV_VDATA", BV_VDATA);
-        data_str.replace("BV_UPCDATA", BV_UPCDATA);
-        data = QByteArray(data_str.toUtf8());
+        data_str.replace("BV_UPPCDATA", BV_UPPCDATA);
+        data = data_str.toUtf8();
         hipot_button->write(data, timeout_msec);
         break;
     case TestButton::Test::VTH:
@@ -74,13 +84,20 @@ void SerialThread::hipot_configure(SerialButton * hipot_button, TestButton::Test
         break;
     case TestButton::Test::BVSTEP:
         if (step_data.empty()) {
-            qDebug() << "empty step data";
             return;
         }
-        BV_VDATA = step_data[0];
-        data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC 0.02;LOWC 0;TTIM 0.1;RTIM 0.1;FTIM 0.1;ARC 0;WTIM 0;RAMP ON\n";
+        BV_VDATA = step_data[0][0];
+        BV_UPPCDATA = step_data[0][1];
+        BV_TTIMDATA = step_data[0][2];
+        BV_RTIMDATA = step_data[0][3];
+        BV_FTIMDATA = step_data[0][4];
+        data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC BV_UPPCDATA;LOWC 0;TTIM BV_TTIMDATA;RTIM BV_RTIMDATA;FTIM BV_FTIMDATA;ARC 0;WTIM 0;RAMP ON\n";
         data_str.replace("BV_VDATA", BV_VDATA);
-        data = QByteArray(data_str.toUtf8());
+        data_str.replace("BV_UPPCDATA", BV_UPPCDATA);
+        data_str.replace("BV_TTIMDATA", BV_TTIMDATA);
+        data_str.replace("BV_RTIMDATA", BV_RTIMDATA);
+        data_str.replace("BV_FTIMDATA", BV_FTIMDATA);
+        data = data_str.toUtf8();
         hipot_button->write(data, timeout_msec);
         break;
     }
@@ -120,6 +137,9 @@ void SerialThread::bv_test(TestButton * selected) {
     float progress_scale = 100/(max_col * max_row);
     for(int c = 0; c < max_col; c++) {
         for(int r = 0; r < max_row; r++) {
+            if (checkAbort()) {
+                return;
+            }
             QByteArray mcu_data = QString::number(c).append(QString::number(r)).append("000\n").toUtf8();
             mcu->write(mcu_data, 300);
             hipot->write("FUNC:STAR\n", 300);
@@ -133,7 +153,9 @@ void SerialThread::bv_test(TestButton * selected) {
             emit tableUpdate(p, 1, QString::number(c).trimmed());
             emit tableUpdate(p, 2, QString::number(r).trimmed());
             emit tableUpdate(p, 3, config_data[0].trimmed());
-            emit tableUpdate(p, 7, H.trimmed());
+            emit tableUpdate(p, 4, QString(H).trimmed().split(",")[1]);
+            emit tableUpdate(p, 5, QString(H).trimmed().split(",")[2]);
+            emit tableUpdate(p, 6, QString(H).trimmed().split(",")[3]);
             emit progressUpdate(p * progress_scale);
         }
     }
@@ -155,6 +177,9 @@ void SerialThread::vth_test(TestButton * selected) {
     float progress_scale = 100/(max_col * max_row);
     for(int c = 0; c < max_col; c++) {
         for(int r = 0; r < max_row; r++) {
+            if (checkAbort()) {
+                return;
+            }
             QByteArray mcu_data = QString::number(c).append(QString::number(r)).append("000\n").toUtf8();
             mcu->write(mcu_data, 300);
             psu->write("INST CH3\n", 300);
@@ -170,15 +195,20 @@ void SerialThread::vth_test(TestButton * selected) {
             psu->write("MEAS:CURR?\n", 300);
             msleep(500);
             QByteArray i_high = psu->read(200, 300);
+            i_low = i_low.trimmed();
+            i_high = i_high.trimmed();
             psu->write("CHAN:OUTP OFF\n", 300);
-            // qDebug() << i_low << i_high;
+            float vth_low = config_data[2].toFloat() / 1000;
+            float vth_high = config_data[3].toFloat() / 1000;
+            QString res_pf = (i_low.toFloat() < vth_low && i_high.toFloat() > vth_high) ? "Pass" : "Fail";
             p++;
             emit tableUpdate(p, 0, QDateTime::currentDateTime().toString().trimmed().remove(","));
             emit tableUpdate(p, 1, QString::number(c).trimmed());
             emit tableUpdate(p, 2, QString::number(r).trimmed());
             emit tableUpdate(p, 3, config_data[0].trimmed());
-            emit tableUpdate(p, 4, i_low.trimmed());
-            emit tableUpdate(p, 5, i_high.trimmed());
+            emit tableUpdate(p, 7, QString::number(1000 * i_high.toFloat()));
+            emit tableUpdate(p, 8, QString::number(1000 * i_high.toFloat()));
+            emit tableUpdate(p, 9, res_pf);
             emit progressUpdate(p * progress_scale);
         }
     }
@@ -201,6 +231,9 @@ void SerialThread::rdson_test(TestButton * selected) {
     float progress_scale = 100/(max_col * max_row);
     for(int c = 0; c < max_col; c++) {
         for(int r = 0; r < max_row; r++) {
+            if (checkAbort()) {
+                return;
+            }
             QByteArray mcu_data = QString::number(c).append(QString::number(r)).append("000\n").toUtf8();
             mcu->write(mcu_data, 300);
             psu->write("INST CH3\n", 300);
@@ -212,12 +245,16 @@ void SerialThread::rdson_test(TestButton * selected) {
             QByteArray R = lcr->read(200, 300);
             psu->write("CHAN:OUTP OFF\n", 300);
             // qDebug() << i_low << i_high;
+            R = R.trimmed();
+            float R_limit = config_data[5].trimmed().toFloat() / 1000;
+            QString res_pf = (R.toFloat() < R_limit) ? "Pass" : "Fail";
             p++;
             emit tableUpdate(p, 0, QDateTime::currentDateTime().toString().trimmed());
             emit tableUpdate(p, 1, QString::number(c).trimmed());
             emit tableUpdate(p, 2, QString::number(r).trimmed());
             emit tableUpdate(p, 3, config_data[0].trimmed());
-            emit tableUpdate(p, 6, R.trimmed());
+            emit tableUpdate(p, 10, QString::number(1000 * R.toFloat()));
+            emit tableUpdate(p, 11, "TBA");
             emit progressUpdate(p * progress_scale);
         }
     }
@@ -229,18 +266,42 @@ void SerialThread::rdson_test(TestButton * selected) {
 
 void SerialThread::bvstep_test(TestButton * selected) {
     SerialButton * hipot = *selected->findSerial(SerialButton::HIPOT);
+    float progress_scale = 100/step_data.size();
+    int p = 0;
     for(size_t i = 0; i < step_data.size(); i++) {
-        QString BV_VDATA = step_data[i];
-        QString data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC 0.02;LOWC 0;TTIM 0.1;RTIM 0.1;FTIM 0.1;ARC 0;WTIM 0;RAMP ON\n";
+        if (checkAbort()) {
+            return;
+        }
+        QString BV_VDATA = step_data[i][0];
+        QString BV_UPPCDATA = step_data[i][1];
+        QString BV_TTIMDATA = step_data[i][2];
+        QString BV_RTIMDATA = step_data[i][3];
+        QString BV_FTIMDATA = step_data[i][4];
+        QString data_str = "FUNC:SOUR:STEP 1:DC:VOLT BV_VDATA;UPPC BV_UPPCDATA;LOWC 0;TTIM BV_TTIMDATA;RTIM BV_RTIMDATA;FTIM BV_FTIMDATA;ARC 0;WTIM 0;RAMP ON\n";
         data_str.replace("BV_VDATA", BV_VDATA);
+        data_str.replace("BV_UPPCDATA", BV_UPPCDATA);
+        data_str.replace("BV_TTIMDATA", BV_TTIMDATA);
+        data_str.replace("BV_RTIMDATA", BV_RTIMDATA);
+        data_str.replace("BV_FTIMDATA", BV_FTIMDATA);
         QByteArray data = data_str.toUtf8();
         msleep(300);
         hipot->write(data, 300);
         msleep(300);
         hipot->write("FUNC:STAR\n", 300);
+        msleep(500);
+        QByteArray H = hipot->read(200, 300);
         msleep(300);
         hipot->write("FUNC:STOP\n", 300);
         msleep(300);
+        p++;
+        emit progressUpdate(p * progress_scale);
+        emit tableUpdate(p, 0, QDateTime::currentDateTime().toString().trimmed());
+        emit tableUpdate(p, 1, 0);
+        emit tableUpdate(p, 2, 0);
+        emit tableUpdate(p, 3, config_data[0].trimmed());
+        emit tableUpdate(p, 4, QString(H).trimmed().split(",")[1]);
+        emit tableUpdate(p, 5, QString(H).trimmed().split(",")[2]);
+        emit tableUpdate(p, 6, QString(H).trimmed().split(",")[3]);
     }
 }
 
@@ -408,7 +469,7 @@ void SerialThread::test_set(std::vector<TestButton *> test_buttons) {
     this->test_buttons = test_buttons;
 }
 
-void SerialThread::step_set(std::vector<QString> step_data) {
+void SerialThread::step_set(std::vector<std::vector<QString>> step_data) {
     this->step_data = step_data;
 }
 
@@ -516,7 +577,6 @@ void SerialThread::test(void) {
             bvstep_test(selected);
             break;
     }
-
     emit serialComplete(mode);
     return;
 }

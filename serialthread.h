@@ -45,6 +45,7 @@ public:
     };
     Mode mode = Mode::NONE;
 
+    int abort = 0;
     int timeout_msec = 200;
     qint64 buffer_max = 128;
 
@@ -56,13 +57,17 @@ public:
 
     void setManualPort(SerialButton *, QSerialPortInfo);
     void configuration_set(std::vector<QString> config_data);
-    void step_set(std::vector<QString> step_data);
+    void step_set(std::vector<std::vector<QString>> step_data);
+
+public slots:
+    void setAbort(void);
 
 signals:
     void serialComplete(Mode mode);
     void progressUpdate(int value);
     void tableUpdate(int row, int col, QString val);
     void debug(QString str);
+
 
 private:
     std::vector<TestButton *> test_buttons;
@@ -71,12 +76,15 @@ private:
     void configure(void);
     void test(void);
 
+    int checkAbort(void);
+
+
 
     SerialButton * manual_port = nullptr;
     QSerialPortInfo manual_info;
 
     std::vector<QString> config_data;
-    std::vector<QString> step_data;
+    std::vector<std::vector<QString>> step_data;
 
     void mcu_configure(SerialButton * button, TestButton::Test test_choice);
     void psu_configure(SerialButton * button, TestButton::Test test_choice);

@@ -57,7 +57,8 @@ private:
     QHBoxLayout * hbox_3;
 
     QString step_label;
-    std::vector<QString> step_data;
+
+    std::vector<std::vector<QString>> step_data;
 
     QPushButton * new_button;
     QPushButton * test_button;
@@ -65,14 +66,10 @@ private:
 
     QTextEdit * debug_text;
 
-    const int button_max = 10;
     std::vector<SerialButton *> serial_buttons;
 
-    const int test_max = 4;
     std::vector<TestButton *> test_buttons;
 
-    int max_gan = 6;
-    int max_spec = 6;
     std::vector<std::vector<QString>> gan_data;
 
     QPushButton * autoconnect_button;
