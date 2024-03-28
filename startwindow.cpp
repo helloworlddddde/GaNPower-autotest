@@ -10,6 +10,16 @@ void StartWindow::left_fn(void) {
     connect(static_window, &StaticWindow::signal_1, this, &StartWindow::slot_1);
 }
 
+void StartWindow::right_fn(void) {
+    if (dynamic_on) {
+        return;
+    }
+    dynamic_on = 1;
+    dynamic_window = new DynamicWindow(central_widget);
+    dynamic_window->show();
+    connect(dynamic_window, &DynamicWindow::signal_1, this, &StartWindow::slot_2);
+}
+
 StartWindow::StartWindow(QWidget *parent)
     : QMainWindow(parent)
 {
@@ -37,6 +47,7 @@ StartWindow::StartWindow(QWidget *parent)
 
     right_button = new QPushButton("dynamic");
     right_vbox->addWidget(right_button);
+    connect(right_button, &QPushButton::released, this, &StartWindow::right_fn);
 
     central_hbox->setAlignment(Qt::AlignTop);
     left_vbox->setAlignment(Qt::AlignTop);
@@ -47,4 +58,8 @@ StartWindow::StartWindow(QWidget *parent)
 
 void StartWindow::slot_1(void) {
     static_on = 0;
+}
+
+void StartWindow::slot_2(void) {
+    dynamic_on = 0;
 }

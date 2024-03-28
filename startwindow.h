@@ -5,6 +5,7 @@
 #include <QtWidgets>
 
 #include <staticwindow.h>
+#include <dynamicwindow.h>
 
 
 class StartWindow : public QMainWindow
@@ -13,8 +14,10 @@ class StartWindow : public QMainWindow
 public:
     StartWindow(QWidget *parent = nullptr);
     void left_fn(void);
+    void right_fn(void);
 public slots:
     void slot_1(void);
+    void slot_2(void);
 
 private:
     QWidget * central_widget;
@@ -26,8 +29,10 @@ private:
     QPushButton * right_button;
 
     StaticWindow * static_window;
+    DynamicWindow * dynamic_window;
 
     int static_on;
 
+    int dynamic_on;
 };
 #endif // STARTWINDOW_H

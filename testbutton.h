@@ -15,7 +15,11 @@ public:
         BV,
         VTH,
         RDSON,
-        BVSTEP
+        BVSTEP,
+        VTHSTEP,
+        VTHSTEP2,
+        VTHSTEP3,
+        DPT
     };
 
 

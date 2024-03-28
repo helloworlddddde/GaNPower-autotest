@@ -28,11 +28,13 @@ void TestButton::setupToolTip(void) {
 int TestButton::handshake(int buffer_size, int msec) {
     for(size_t i = 0; i < required.size(); i++) {
         SerialButton * serial_button = *required[i];
-        QByteArray ID_comm = "*IDN?\n";
-        serial_button->write(ID_comm, msec);
-        QString id_str = QString(serial_button->read(buffer_size, msec));
-        if(!id_str.contains(serial_button->getTarget())) {
-            return 0;
+        if (!serial_button->isVisa()) {
+            QByteArray ID_comm = "*IDN?\n";
+            serial_button->write(ID_comm, msec);
+            QString id_str = QString(serial_button->read(buffer_size, msec));
+            if(!id_str.contains(serial_button->getTarget())) {
+                return 0;
+            }
         }
     }
     return 1;

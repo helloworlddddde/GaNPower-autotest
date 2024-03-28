@@ -15,12 +15,17 @@ public:
         MCU,
         PSU,
         HIPOT,
-        LCR
+        LCR,
+        DMM,
+        SIGGEN,
+        OSCO,
+        POW
     };
 
     void setPort(QSerialPort * port);
     void setLabel(Equipment label);
     void setTarget(const QString& target);
+    int isVisa(void);
 
     QSerialPort * getPort(void);
     Equipment getLabel(void);
@@ -32,10 +37,14 @@ public:
     void write(QByteArray, int);
     QByteArray read(int, int);
 
-private:
+
+
+protected:
     Equipment label;
     QSerialPort * port;
     QString target;
+    int is_visa = 0;
+
 };
 
 

@@ -7,6 +7,7 @@
 #include "serialthread.h"
 #include "serialbutton.h"
 #include "testbutton.h"
+#include "visabutton.h"
 
 
 
@@ -29,6 +30,17 @@ public slots:
     void debug_slot(QString);
 protected:
     void closeEvent(QCloseEvent *event);
+    void keyPressEvent(QKeyEvent *event) override
+    {
+        if(event->key() == Qt::Key_C)
+        {
+            configure();
+        }
+
+        if(event->key() == Qt::Key_T) {
+            test();
+        }
+    }
 
 private:
     QString vectorToString(std::vector<QString>);
@@ -41,13 +53,18 @@ private:
 
     void update_buttons(void);
 
+     QVBoxLayout * step_vbox;
+
     QTextEdit * step_text;
-    QVBoxLayout * step_vbox;
+
+
+    QTextEdit * vthstep_text;
 
     QPushButton * select_button;
     QVBoxLayout * select_vbox;
 
     QPushButton * step_button;
+    QPushButton * vthstep_button;
     QWidget * central_widget;
     QVBoxLayout * central_vbox;
 
@@ -57,8 +74,10 @@ private:
     QHBoxLayout * hbox_3;
 
     QString step_label;
+    QString vthstep_label;
 
     std::vector<std::vector<QString>> step_data;
+    std::vector<std::vector<QString>> vthstep_data;
 
     QPushButton * new_button;
     QPushButton * test_button;

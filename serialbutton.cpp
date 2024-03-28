@@ -1,7 +1,7 @@
 #include "serialbutton.h"
 
 SerialButton::SerialButton(const QString & text, QWidget * parent) : QPushButton(text, parent) {
-
+    this->is_visa = 0;
 }
 
 
@@ -36,6 +36,10 @@ QString SerialButton::getTarget(void) {
 QByteArray SerialButton::read(int max_size, int msec) {
     while(this->getPort()->waitForReadyRead(msec));
     return this->getPort()->read(max_size);
+}
+
+int SerialButton::isVisa(void) {
+    return is_visa;
 }
 
 SerialButton::~SerialButton() {

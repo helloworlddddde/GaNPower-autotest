@@ -5,6 +5,7 @@
 #include <QSerialPortInfo>
 #include <QApplication>
 #include "serialbutton.h"
+#include "visabutton.h"
 #include "testbutton.h"
 
 
@@ -59,6 +60,9 @@ public:
     void configuration_set(std::vector<QString> config_data);
     void step_set(std::vector<std::vector<QString>> step_data);
 
+    std::vector<std::vector<QString>> vthstep_data;
+
+    ViSession * default_rm;
 public slots:
     void setAbort(void);
 
@@ -86,14 +90,22 @@ private:
     std::vector<QString> config_data;
     std::vector<std::vector<QString>> step_data;
 
+
+
+
     void mcu_configure(SerialButton * button, TestButton::Test test_choice);
     void psu_configure(SerialButton * button, TestButton::Test test_choice);
     void hipot_configure(SerialButton * button, TestButton::Test test_choice);
     void lcr_configure(SerialButton * button, TestButton::Test test_choice);
+    void siggen_configure(VisaButton * button, TestButton::Test test_choice);
+    void osco_configure(VisaButton * serial_button, TestButton::Test test_choice);
+    void dmm_configure(VisaButton *, TestButton::Test);
     void bv_test(TestButton *);
     void vth_test(TestButton *);
     void rdson_test(TestButton *);
     void bvstep_test(TestButton *);
+    void vthstep_test(TestButton *);
+    void vthstep2_test(TestButton *);
     int max_row = 1;
     int max_col = 1;
 };

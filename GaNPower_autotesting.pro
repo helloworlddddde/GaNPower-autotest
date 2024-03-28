@@ -9,20 +9,26 @@ CONFIG += c++17
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
+INCLUDEPATH += "C:\Program Files (x86)\IVI Foundation\VISA\WinNT\Include"
+LIBS        += "C:/Windows/System32/visa64.dll"
 SOURCES += \
+    dynamicwindow.cpp \
     main.cpp \
     serialbutton.cpp \
     serialthread.cpp \
     startwindow.cpp \
     staticwindow.cpp \
-    testbutton.cpp
+    testbutton.cpp \
+    visabutton.cpp
 
 HEADERS += \
+    dynamicwindow.h \
     serialbutton.h \
     serialthread.h \
     startwindow.h \
     staticwindow.h \
-    testbutton.h
+    testbutton.h \
+    visabutton.h
 
 FORMS +=
 

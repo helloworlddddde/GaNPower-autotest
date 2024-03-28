@@ -5,6 +5,7 @@ SerialButton * dialog_button = nullptr;
 QProgressDialog * progress_dialog;
 QPushButton * cancel_button;
 QQueue<QString> str_queue;
+ViSession default_rm_static;
 
 void StaticWindow::onCompute(QString choice) {
     int idx = choice.split(":").at(0).toInt();
@@ -139,6 +140,7 @@ void StaticWindow::configure(void) {
     serial_thread->test_set(test_buttons);
     serial_thread->configuration_set(configuration_data);
     serial_thread->step_set(step_data);
+    serial_thread->vthstep_data = vthstep_data;
     serial_thread->mode = SerialThread::Mode::CONFIGURE;
     serial_thread->start();
 }
@@ -157,6 +159,7 @@ void StaticWindow::test(void) {
     serial_thread->test_set(test_buttons);
     serial_thread->configuration_set(configuration_data);
     serial_thread->step_set(step_data);
+    serial_thread->vthstep_data = vthstep_data;
     serial_thread->setMaxRow(row_combox->currentIndex() + 1);
     serial_thread->setMaxCol(col_combox->currentIndex() + 1);
     serial_thread->mode = SerialThread::Mode::TEST;
@@ -166,7 +169,7 @@ void StaticWindow::test(void) {
 StaticWindow::StaticWindow(QWidget *parent)
     : QMainWindow{parent}
 {
-    this->setAttribute(Qt::WA_DeleteOnClose);
+    viOpenDefaultRM (&default_rm_static);
     this->setFixedSize(QSize(1250, 350));
     this->setWindowIcon(QIcon(QCoreApplication::applicationDirPath() + "/Logo.ico"));
     this->setWindowTitle("Static Testing");
@@ -196,7 +199,7 @@ StaticWindow::StaticWindow(QWidget *parent)
 
     select_vbox = new QVBoxLayout();
     hbox_0->addLayout(select_vbox);
-    step_button = new QPushButton("step");
+    step_button = new QPushButton("bv step");
     select_vbox->addWidget(step_button);
     connect(step_button, &QPushButton::released, this, [this](void) {
         if (serial_thread->isRunning()) {
@@ -235,6 +238,48 @@ StaticWindow::StaticWindow(QWidget *parent)
         }
         step_text->setText(pre_text);
     });
+
+    vthstep_button = new QPushButton("vth step");
+    select_vbox->addWidget(vthstep_button);
+    connect(vthstep_button, &QPushButton::released, this, [this](void) {
+        if (serial_thread->isRunning()) {
+            return;
+        }
+        vthstep_data.clear();
+        vthstep_label = "";
+        QString filename = QFileDialog::getOpenFileName(NULL, tr("Get Step Data"), "", tr("CSV file (*.csv)"));
+        QFile file(filename);
+        file.open(QIODevice::ReadOnly);
+        int toggle = 0;
+        int idx = 0;
+        while (!file.atEnd()) {
+            QString pre_line = file.readLine();
+            QList<QString> line = pre_line.split(',');
+            if (toggle == 1) {
+                vthstep_data.push_back(std::vector<QString>());
+                for(int c = 0; c < line.size(); c++) {
+                    QString element = line[c].trimmed();
+                    vthstep_data[idx].push_back(element);
+                }
+                idx++;
+            } else {
+                QString trimmed = pre_line.trimmed().replace(",", " ");
+                if (trimmed.compare("STEP (V)")) {
+                    vthstep_text->setText("");
+                    return;
+                }
+                vthstep_label = pre_line.trimmed().replace(",", " ");
+                toggle++;
+            }
+        }
+        QString pre_text = vthstep_label;
+        for(size_t i = 0; i < vthstep_data.size(); i++) {
+            pre_text += "\n" + vectorToString(vthstep_data[i]);
+        }
+        vthstep_text->setText(pre_text);
+
+    });
+
     gan_combox = new QComboBox(this);
     select_vbox->addWidget(gan_combox);
     select_button = new QPushButton("select");
@@ -243,9 +288,11 @@ StaticWindow::StaticWindow(QWidget *parent)
     hbox_0->addLayout(step_vbox);
     step_text = new QTextEdit("", this);
     step_vbox->addWidget(step_text);
+    vthstep_text = new QTextEdit("", this);
+    step_vbox->addWidget(vthstep_text);
     configuration_text = new QTextEdit("", this);
     step_vbox->addWidget(configuration_text);
-    result_table = new QTableWidget(26, 20, this);
+    result_table = new QTableWidget(201, 20, this);
     hbox_0->addWidget(result_table);
     QFile file(QCoreApplication::applicationDirPath() + "/GaNData.csv");
     file.open(QIODevice::ReadOnly);
@@ -294,9 +341,26 @@ StaticWindow::StaticWindow(QWidget *parent)
     serial_buttons.push_back(new SerialButton("LCR"));
     serial_buttons[3]->setLabel(SerialButton::Equipment::LCR);
     serial_buttons[3]->setTarget("TH2827C");
+    serial_buttons.push_back(new VisaButton("DMM"));
+    serial_buttons.back()->setLabel(SerialButton::Equipment::DMM);
+    serial_buttons.back()->setTarget("34465A");
+    VisaButton * temp4 = (VisaButton *) serial_buttons.back();
+    temp4->visa_port = ViString("USB0::0x2A8D::0x0101::MY60091049::INSTR");
+
     for(size_t i = 0; i < serial_buttons.size(); i++) {
-        hbox_1->addWidget(serial_buttons[i]);
         serial_buttons[i]->setPort(nullptr);
+        hbox_1->addWidget(serial_buttons[i]);
+        if (serial_buttons[i]->isVisa()) {
+            connect(serial_buttons[i], &QPushButton::released, this, [this, i](void) {
+                if (serial_thread->isRunning()) {
+                    return;
+                }
+                serial_thread->setManualPort(serial_buttons[i], (QSerialPortInfo) NULL);
+                serial_thread->mode = SerialThread::Mode::MANUALCONNECT;
+                serial_thread->start();
+            });
+            continue;
+        }
         connect(serial_buttons[i], &QPushButton::released, this, [this, i](void) {
             if (serial_thread->isRunning()) {
                 return;
@@ -342,6 +406,18 @@ StaticWindow::StaticWindow(QWidget *parent)
     test_buttons[3]->setLabel(TestButton::Test::BVSTEP);
     test_buttons[3]->required.insert(test_buttons[3]->required.end(), {&serial_buttons[2]});
     test_buttons[3]->setupToolTip();
+    test_buttons.push_back(new TestButton("VTHSTEP"));
+    test_buttons[4]->setLabel(TestButton::Test::VTHSTEP);
+    test_buttons[4]->required.insert(test_buttons[4]->required.end(), {&serial_buttons[1]});
+    test_buttons[4]->setupToolTip();
+    test_buttons.push_back(new TestButton("VTHSTEP2"));
+    test_buttons.back()->setLabel(TestButton::Test::VTHSTEP2);
+    test_buttons.back()->required.insert(test_buttons.back()->required.end(), {&serial_buttons[1], &serial_buttons[4]});
+    test_buttons.back()->setupToolTip();
+    test_buttons.push_back(new TestButton("VTHSTEP3"));
+    test_buttons.back()->setLabel(TestButton::Test::VTHSTEP3);
+    test_buttons.back()->required.insert(test_buttons.back()->required.end(), {&serial_buttons[1], &serial_buttons[4]});
+    test_buttons.back()->setupToolTip();
     for(size_t i = 0; i < test_buttons.size(); i++) {
         hbox_2->addWidget(test_buttons[i]);
         connect(test_buttons[i], &QPushButton::released, this, [this, i](void) {
@@ -377,19 +453,21 @@ StaticWindow::StaticWindow(QWidget *parent)
     serial_thread->mode = SerialThread::Mode::NONE;
     serial_thread->timeout_msec = 200;
     serial_thread->buffer_max = 128;
+    serial_thread->default_rm = &default_rm_static;
 
     central_vbox->setAlignment(Qt::AlignTop);
     hbox_0->setAlignment(Qt::AlignTop);
     hbox_1->setAlignment(Qt::AlignTop);
     hbox_2->setAlignment(Qt::AlignTop);
-    row_combox->setMaximumHeight(300);
-    col_combox->setMaximumHeight(300);
-    step_button->setMaximumHeight(300);
-    select_button->setMaximumHeight(300);
-    gan_combox->setMaximumHeight(300);
-    configuration_text->setMaximumHeight(300);
+    // row_combox->setMaximumHeight(300);
+    // col_combox->setMaximumHeight(300);
+    // step_button->setMaximumHeight(300);
+    // select_button->setMaximumHeight(300);
+    // gan_combox->setMaximumHeight(300);
+    // configuration_text->setMaximumHeight(300);
     configuration_text->setReadOnly(1);
     step_text->setReadOnly(1);
+    vthstep_text->setReadOnly(1);
     result_table->setMaximumHeight(300);
     for(int r = 0; r < result_table->rowCount(); r++) {
         for(int c = 0; c < result_table->columnCount(); c++) {
