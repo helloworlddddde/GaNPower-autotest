@@ -106,6 +106,7 @@ private:
     void bvstep_test(TestButton *);
     void vthstep_test(TestButton *);
     void vthstep2_test(TestButton *);
+    void vthstep3_test(TestButton *);
     int max_row = 1;
     int max_col = 1;
 };

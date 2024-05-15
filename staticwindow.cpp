@@ -292,7 +292,7 @@ StaticWindow::StaticWindow(QWidget *parent)
     step_vbox->addWidget(vthstep_text);
     configuration_text = new QTextEdit("", this);
     step_vbox->addWidget(configuration_text);
-    result_table = new QTableWidget(201, 20, this);
+    result_table = new QTableWidget(10001, 20, this);
     hbox_0->addWidget(result_table);
     QFile file(QCoreApplication::applicationDirPath() + "/GaNData.csv");
     file.open(QIODevice::ReadOnly);
@@ -408,15 +408,15 @@ StaticWindow::StaticWindow(QWidget *parent)
     test_buttons[3]->setupToolTip();
     test_buttons.push_back(new TestButton("VTHSTEP"));
     test_buttons[4]->setLabel(TestButton::Test::VTHSTEP);
-    test_buttons[4]->required.insert(test_buttons[4]->required.end(), {&serial_buttons[1]});
+    test_buttons[4]->required.insert(test_buttons[4]->required.end(), {&serial_buttons[1], &serial_buttons[4]});
     test_buttons[4]->setupToolTip();
     test_buttons.push_back(new TestButton("VTHSTEP2"));
     test_buttons.back()->setLabel(TestButton::Test::VTHSTEP2);
-    test_buttons.back()->required.insert(test_buttons.back()->required.end(), {&serial_buttons[1], &serial_buttons[4]});
+    test_buttons.back()->required.insert(test_buttons.back()->required.end(), {&serial_buttons[0], &serial_buttons[1], &serial_buttons[4]});
     test_buttons.back()->setupToolTip();
     test_buttons.push_back(new TestButton("VTHSTEP3"));
     test_buttons.back()->setLabel(TestButton::Test::VTHSTEP3);
-    test_buttons.back()->required.insert(test_buttons.back()->required.end(), {&serial_buttons[1], &serial_buttons[4]});
+    test_buttons.back()->required.insert(test_buttons.back()->required.end(), {&serial_buttons[0], &serial_buttons[1], &serial_buttons[4]});
     test_buttons.back()->setupToolTip();
     for(size_t i = 0; i < test_buttons.size(); i++) {
         hbox_2->addWidget(test_buttons[i]);
